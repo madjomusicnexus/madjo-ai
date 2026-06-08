@@ -125,7 +125,7 @@ export default function Metronome({ suggestedTempo, exerciseDifficulty = 'interm
           min="40"
           max="200"
           value={bpm}
-          onChange={(e) => handleBpmChange(parseInt(e.target.value))}
+          onChange={() => handleBpmChange(parseInt(e.target.value))}
           className="w-full h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
         />
         <div className="flex justify-between text-xs text-purple-400 mt-1">

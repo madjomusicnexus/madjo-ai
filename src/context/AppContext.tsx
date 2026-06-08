@@ -175,3 +175,14 @@ export function useApp() {
   if (!context) throw new Error('useApp must be used within AppProvider');
   return context;
 }
+export type { Page };
+
+export type Page = 'dashboard' | 'profile' | 'instruments' | 'routine' | 'generate' | 'teacher';
+
+const toggleExercise = (exerciseId: string) => {
+  console.log('Toggle exercise:', exerciseId);
+};
+
+const syncProgress = async () => {
+  console.log('Sync progress');
+};
