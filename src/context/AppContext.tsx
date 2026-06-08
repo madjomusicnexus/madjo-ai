@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
-import type { StudentProfile, PracticeRoutine, Page, Instrument, StudentInstrument } from '../types';
+import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import type { StudentProfile, PracticeRoutine, Page, StudentInstrument } from '../types';
 
 interface AppState {
   page: Page;
@@ -23,11 +22,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>({
     page: 'dashboard',
     student: {
+      id: '',
       name: '',
+      avatar: '',
       email: '',
       instruments: [],
       dailyPracticeGoal: 30,
+      streak: 0,
+      joinedDate: new Date().toISOString(),
+      bio: '',
       focusAreas: [],
+      syllabus: 'abrsm',
+      genre: 'classical',
       singingWhilePlaying: false,
     },
     routine: null,
@@ -55,7 +61,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const includeAllInstruments = localStorage.getItem('include_all_instruments') === 'true';
     const allInstruments = state.student.instruments || [];
     
-    // Get selected instrument from localStorage
     const selectedInstrumentId = localStorage.getItem('selected_instrument_id');
     let selectedInstrument = allInstruments.find(i => i.id === selectedInstrumentId);
     
@@ -76,7 +81,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': '`Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`'
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           instrument,
@@ -106,7 +111,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const routine: PracticeRoutine = {
         id: `routine-${Date.now()}`,
         date: new Date().toISOString().split('T')[0],
-        instrument: instrument as Instrument,
+        instrument: instrument as any,
         gradeLevel,
         focusArea: data.focusArea || `${genre} Grade ${gradeLevel} ${instrument} Practice`,
         totalDuration: data.exercises.reduce((sum: number, e: any) => sum + (e.duration || 0), 0),
@@ -142,7 +147,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state.isGenerating, state.student]);
 
-  // Load profile from localStorage on mount
   useEffect(() => {
     const loadProfile = async () => {
       const saved = localStorage.getItem('madjo_profile');
