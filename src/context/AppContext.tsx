@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import type { StudentProfile, PracticeRoutine, Page, StudentInstrument } from '../types';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import type { StudentProfile, PracticeRoutine, StudentInstrument } from '../types';
+
+export type Page = 'dashboard' | 'profile' | 'instruments' | 'routine' | 'generate';
 
 interface AppState {
   page: Page;
@@ -14,6 +16,8 @@ interface AppContextValue extends AppState {
   navigate: (page: Page) => void;
   generateRoutine: () => Promise<void>;
   updateProfile: (updates: Partial<StudentProfile>) => void;
+  toggleExercise: (exerciseId: string) => void;
+  syncProgress: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -53,17 +57,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const toggleExercise = useCallback((exerciseId: string) => {
+    setState(prev => {
+      if (!prev.routine) return prev;
+      const updatedExercises = prev.routine.exercises.map(ex =>
+        ex.id === exerciseId ? { ...ex, completed: !ex.completed, completedAt: !ex.completed ? new Date().toISOString() : null } : ex
+      );
+      return { ...prev, routine: { ...prev.routine, exercises: updatedExercises } };
+    });
+  }, []);
+
+  const syncProgress = useCallback(async () => {
+    console.log('Syncing progress...');
+    return Promise.resolve();
+  }, []);
+
   const generateRoutine = useCallback(async () => {
     if (state.isGenerating) return;
-    
     setState(prev => ({ ...prev, isGenerating: true, generateError: null }));
     
-    const includeAllInstruments = localStorage.getItem('include_all_instruments') === 'true';
     const allInstruments = state.student.instruments || [];
-    
     const selectedInstrumentId = localStorage.getItem('selected_instrument_id');
     let selectedInstrument = allInstruments.find(i => i.id === selectedInstrumentId);
-    
     if (!selectedInstrument && allInstruments.length > 0) {
       selectedInstrument = allInstruments.find(i => i.isPrimary) || allInstruments[0];
     }
@@ -74,37 +89,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const genre = selectedInstrument?.genre || 'classical';
     const focusAreas = state.student.focusAreas || [];
     const singingWhilePlaying = state.student.singingWhilePlaying || false;
-    const timePerInstrument = Math.floor((state.student.dailyPracticeGoal || 30) / (includeAllInstruments ? allInstruments.length : 1));
     
     try {
       const response = await fetch('https://hevyladjfoexdzyhtjwx.supabase.co/functions/v1/generate-routine', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
-          instrument,
-          gradeLevel,
-          dailyPracticeGoal: timePerInstrument,
-          syllabus,
-          genre,
-          focusAreas,
-          singingWhilePlaying,
-          hasMultipleInstruments: allInstruments.length > 1,
-          includeAllInstruments,
-          allInstruments: allInstruments.map(i => ({
-            name: i.name,
-            gradeLevel: i.gradeLevel,
-            syllabus: i.syllabus,
-            genre: i.genre,
-            isPrimary: i.isPrimary
-          })),
-        })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ instrument, gradeLevel, syllabus, genre, focusAreas, singingWhilePlaying })
       });
-      
       const data = await response.json();
-      
       if (data.error) throw new Error(data.error);
       if (!data?.exercises) throw new Error('Invalid response');
       
@@ -129,42 +121,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
           completedAt: null
         }))
       };
-      
-      setState(prev => ({
-        ...prev,
-        isGenerating: false,
-        routine,
-        page: 'routine'
-      }));
-      
+      setState(prev => ({ ...prev, isGenerating: false, routine, page: 'routine' }));
     } catch (err) {
-      console.error('Generate routine error:', err);
-      setState(prev => ({
-        ...prev,
-        isGenerating: false,
-        generateError: err instanceof Error ? err.message : 'Failed to generate routine'
-      }));
+      console.error('Generate error:', err);
+      setState(prev => ({ ...prev, isGenerating: false, generateError: err instanceof Error ? err.message : 'Failed' }));
     }
   }, [state.isGenerating, state.student]);
 
   useEffect(() => {
-    const loadProfile = async () => {
-      const saved = localStorage.getItem('madjo_profile');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setState(prev => ({
-            ...prev,
-            student: { ...prev.student, ...parsed }
-          }));
-        } catch(e) { console.log('Error loading profile'); }
-      }
-    };
-    loadProfile();
+    const saved = localStorage.getItem('madjo_profile');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setState(prev => ({ ...prev, student: { ...prev.student, ...parsed } }));
+      } catch(e) { console.log('Error loading profile'); }
+    }
   }, []);
 
   return (
-    <AppContext.Provider value={{ ...state, navigate, generateRoutine, updateProfile }}>
+    <AppContext.Provider value={{ ...state, navigate, generateRoutine, updateProfile, toggleExercise, syncProgress }}>
       {children}
     </AppContext.Provider>
   );
@@ -175,14 +150,3 @@ export function useApp() {
   if (!context) throw new Error('useApp must be used within AppProvider');
   return context;
 }
-export type { Page };
-
-export type Page = 'dashboard' | 'profile' | 'instruments' | 'routine' | 'generate' | 'teacher';
-
-const toggleExercise = (exerciseId: string) => {
-  console.log('Toggle exercise:', exerciseId);
-};
-
-const syncProgress = async () => {
-  console.log('Sync progress');
-};
