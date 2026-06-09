@@ -19,6 +19,7 @@ interface AppContextValue extends AppState {
   updateProfile: (updates: Partial<StudentProfile>) => Promise<void>;
   toggleExercise: (exerciseId: string) => void;
   syncProgress: () => Promise<void>;
+  exportReport: () => void;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -51,11 +52,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, page }));
   }, []);
 
-  // Load profile from Supabase on mount
+  // Load profile and active routine from Supabase on mount
   useEffect(() => {
-    const loadProfile = async () => {
+    const loadData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        // Load profile
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
@@ -82,15 +84,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
           }));
         }
+        
+        // Load active routine
+        const { data: routine } = await supabase
+          .from('active_routines')
+          .select('routine_data')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (routine?.routine_data) {
+          setState(prev => ({ ...prev, routine: routine.routine_data }));
+        }
       }
     };
-    loadProfile();
+    loadData();
   }, []);
 
   const updateProfile = useCallback(async (updates: Partial<StudentProfile>) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      // Update Supabase
       await supabase
         .from('profiles')
         .upsert({
@@ -105,15 +117,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
     }
     
-    // Update local state
     setState(prev => ({
       ...prev,
       student: { ...prev.student, ...updates }
     }));
-    
-    // Also save to localStorage as backup
-    localStorage.setItem('madjo_profile', JSON.stringify({ ...state.student, ...updates }));
-  }, [state.student]);
+  }, []);
 
   const toggleExercise = useCallback((exerciseId: string) => {
     setState(prev => {
@@ -121,7 +129,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const updatedExercises = prev.routine.exercises.map(ex =>
         ex.id === exerciseId ? { ...ex, completed: !ex.completed, completedAt: !ex.completed ? new Date().toISOString() : null } : ex
       );
-      return { ...prev, routine: { ...prev.routine, exercises: updatedExercises } };
+      const completedCount = updatedExercises.filter(e => e.completed).length;
+      const updatedRoutine = { ...prev.routine, exercises: updatedExercises };
+      
+      // Save progress to Supabase
+      const saveProgress = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && updatedRoutine) {
+          await supabase
+            .from('active_routines')
+            .upsert({
+              user_id: user.id,
+              routine_data: updatedRoutine,
+              date: updatedRoutine.date,
+              completed_count: completedCount,
+              total_count: updatedExercises.length,
+              updated_at: new Date().toISOString(),
+            });
+        }
+      };
+      saveProgress();
+      
+      return { ...prev, routine: updatedRoutine };
     });
   }, []);
 
@@ -129,6 +158,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     console.log('Syncing progress...');
     return Promise.resolve();
   }, []);
+
+  const exportReport = useCallback(() => {
+    if (!state.routine) {
+      alert('No routine to export');
+      return;
+    }
+    // Simple export as JSON
+    const dataStr = JSON.stringify(state.routine, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    const exportFileDefaultName = `practice-routine-${new Date().toISOString().split('T')[0]}.json`;
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  }, [state.routine]);
 
   const generateRoutine = useCallback(async () => {
     if (state.isGenerating) return;
@@ -193,6 +237,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }))
       };
       
+      // Save to Supabase (overwrites existing)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('active_routines')
+          .upsert({
+            user_id: user.id,
+            routine_data: routine,
+            date: routine.date,
+            completed_count: 0,
+            total_count: routine.exercises.length,
+            updated_at: new Date().toISOString(),
+          });
+      }
+      
       setState(prev => ({ ...prev, isGenerating: false, routine, page: 'routine' }));
     } catch (err) {
       console.error('Generate error:', err);
@@ -201,7 +260,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [state.isGenerating, state.student]);
 
   return (
-    <AppContext.Provider value={{ ...state, navigate, generateRoutine, updateProfile, toggleExercise, syncProgress }}>
+    <AppContext.Provider value={{ ...state, navigate, generateRoutine, updateProfile, toggleExercise, syncProgress, exportReport }}>
       {children}
     </AppContext.Provider>
   );
