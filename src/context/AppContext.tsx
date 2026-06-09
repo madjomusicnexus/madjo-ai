@@ -149,7 +149,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             });
         }
       };
-      saveProgress();
       
       return { ...prev, routine: updatedRoutine };
     });
