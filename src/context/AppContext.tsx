@@ -271,3 +271,50 @@ export function useApp() {
   if (!context) throw new Error('useApp must be used within AppProvider');
   return context;
 }
+
+// Missing functions needed by Dashboard and PracticeRoutine
+
+export const downloadPDF = (html: string, filename: string) => {
+  const blob = new Blob([html], { type: 'application/pdf' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+};
+
+export const generateReportHTML = (routine: PracticeRoutine, student: StudentProfile) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Practice Report - ${student.name}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #1B2A4A; }
+        .exercise { margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 8px; }
+        .completed { background: #e0f5e0; }
+        .title { font-size: 18px; font-weight: bold; }
+        .date { color: #666; }
+      </style>
+    </head>
+    <body>
+      <h1>Practice Report</h1>
+      <p class="date">Date: ${routine.date}</p>
+      <p>Student: ${student.name}</p>
+      <p>Instrument: ${routine.instrument}</p>
+      <p>Grade: ${routine.gradeLevel}</p>
+      <p>Focus: ${routine.focusArea}</p>
+      <h2>Exercises (${routine.exercises.filter(e => e.completed).length}/${routine.exercises.length} completed)</h2>
+      ${routine.exercises.map(ex => `
+        <div class="exercise ${ex.completed ? 'completed' : ''}">
+          <div class="title">${ex.title}</div>
+          <div>Duration: ${ex.duration} min</div>
+          <div>Difficulty: ${ex.difficulty}</div>
+          <div>${ex.description}</div>
+        </div>
+      `).join('')}
+    </body>
+    </html>
+  `;
+};
