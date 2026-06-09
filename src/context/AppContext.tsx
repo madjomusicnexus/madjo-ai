@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 import type { StudentProfile, PracticeRoutine } from '../types';
 
 export type Page = 'dashboard' | 'profile' | 'instruments' | 'routine' | 'generate';
@@ -15,7 +16,7 @@ interface AppState {
 interface AppContextValue extends AppState {
   navigate: (page: Page) => void;
   generateRoutine: () => Promise<void>;
-  updateProfile: (updates: Partial<StudentProfile>) => void;
+  updateProfile: (updates: Partial<StudentProfile>) => Promise<void>;
   toggleExercise: (exerciseId: string) => void;
   syncProgress: () => Promise<void>;
 }
@@ -50,12 +51,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, page }));
   }, []);
 
-  const updateProfile = useCallback((updates: Partial<StudentProfile>) => {
+  // Load profile from Supabase on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          setState(prev => ({
+            ...prev,
+            student: {
+              id: profile.id || '',
+              name: profile.full_name || '',
+              avatar: profile.avatar_url || '',
+              email: profile.email || user.email || '',
+              instruments: profile.instruments || [],
+              dailyPracticeGoal: profile.daily_practice_minutes || 30,
+              streak: profile.streak || 0,
+              joinedDate: profile.created_at || new Date().toISOString(),
+              bio: profile.bio || '',
+              focusAreas: profile.focus_areas || [],
+              syllabus: profile.syllabus || 'abrsm',
+              genre: profile.genre || 'classical',
+              singingWhilePlaying: profile.singing_while_playing || false,
+            }
+          }));
+        }
+      }
+    };
+    loadProfile();
+  }, []);
+
+  const updateProfile = useCallback(async (updates: Partial<StudentProfile>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      // Update Supabase
+      await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          full_name: updates.name,
+          email: updates.email,
+          instruments: updates.instruments,
+          daily_practice_minutes: updates.dailyPracticeGoal,
+          focus_areas: updates.focusAreas,
+          singing_while_playing: updates.singingWhilePlaying,
+          updated_at: new Date().toISOString(),
+        });
+    }
+    
+    // Update local state
     setState(prev => ({
       ...prev,
       student: { ...prev.student, ...updates }
     }));
-  }, []);
+    
+    // Also save to localStorage as backup
+    localStorage.setItem('madjo_profile', JSON.stringify({ ...state.student, ...updates }));
+  }, [state.student]);
 
   const toggleExercise = useCallback((exerciseId: string) => {
     setState(prev => {
@@ -141,16 +199,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setState(prev => ({ ...prev, isGenerating: false, generateError: err instanceof Error ? err.message : 'Failed to generate routine' }));
     }
   }, [state.isGenerating, state.student]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('madjo_profile');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setState(prev => ({ ...prev, student: { ...prev.student, ...parsed } }));
-      } catch(e) { console.log('Error loading profile'); }
-    }
-  }, []);
 
   return (
     <AppContext.Provider value={{ ...state, navigate, generateRoutine, updateProfile, toggleExercise, syncProgress }}>
