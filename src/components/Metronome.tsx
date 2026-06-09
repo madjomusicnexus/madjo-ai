@@ -18,7 +18,7 @@ export default function Metronome({ suggestedTempo, exerciseDifficulty = 'interm
 
   useEffect(() => {
     // Listen for metronome clicks for visual pulse
-    const handleClick = (e: CustomEvent) => {
+    const handleClick = () => {
       setPulseIntensity(1);
       setTimeout(() => setPulseIntensity(0), 150);
     };
