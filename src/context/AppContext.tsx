@@ -133,7 +133,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const updatedRoutine = { ...prev.routine, exercises: updatedExercises };
       
       // Save progress to Supabase
-      const saveProgress = async () => {
+      // Save immediately without delay
+      const saveNow = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user && updatedRoutine) {
           await supabase
