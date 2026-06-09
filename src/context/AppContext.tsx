@@ -132,7 +132,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const { data: routineData } = await supabase
         .from('active_routines')
         .select('routine_data')
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id)
         .maybeSingle();
 
       if (routineData?.routine_data) {
@@ -182,10 +182,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           saveProfileToLocalStorage(profile);
 
       // Load active routine from Supabase
+      const { data: { user } } = await supabase.auth.getUser();
       const { data: routineData } = await supabase
         .from('active_routines')
         .select('routine_data')
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id)
         .maybeSingle();
 
       if (routineData?.routine_data) {

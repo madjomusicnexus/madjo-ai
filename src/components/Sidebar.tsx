@@ -8,7 +8,7 @@ import {
   ListChecks,
   Menu,
   X,
-  BookOpen,
+
   LogOut,
 } from 'lucide-react';
 import { useState } from 'react';

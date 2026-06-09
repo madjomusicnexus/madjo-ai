@@ -26,7 +26,7 @@ export default function InstrumentSelector({
   instruments, 
   selectedInstrumentId, 
   onSelect,
-  label = "Select Instrument"
+  // label = "Select Instrument"
 }: InstrumentSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   

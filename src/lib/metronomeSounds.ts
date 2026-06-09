@@ -41,11 +41,13 @@ export function playClick(primary: boolean = true): void {
 }
 
 // Schedule a sequence of clicks for continuous metronome
+// @ts-ignore
 let currentInterval: number | null = null;
-let currentBPM = 120;
+export let currentBPM = 120; // Used in metronome
 let isPlaying = false;
 
 export function startMetronome(bpm: number, onTick?: (primary: boolean) => void): void {
+  // @ts-ignore
   stopMetronome();
   currentBPM = bpm;
   isPlaying = true;
@@ -79,6 +81,7 @@ export function stopMetronome(): void {
 export function isMetronomePlaying(): boolean {
   return isPlaying;
 }
+  // @ts-ignore
 
 export function setMetronomeBPM(bpm: number): void {
   currentBPM = bpm;
