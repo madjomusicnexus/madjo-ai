@@ -17,7 +17,6 @@ interface ExerciseCardProps {
 }
 
 export default function ExerciseCard({ exercise, onToggle }: ExerciseCardProps) {
-  
   const {
     id,
     title,
@@ -36,14 +35,6 @@ export default function ExerciseCard({ exercise, onToggle }: ExerciseCardProps) 
     advanced: 'bg-red-100 text-red-700',
   };
 
-  const handleClick = () => {
-    if (onToggle) {
-      onToggle(id);
-    } else {
-      console.error("🔘 onToggle is undefined!");
-    }
-  };
-
   return (
     <div className={`bg-white rounded-xl shadow-sm border transition-all ${
       completed ? 'border-green-200 bg-green-50/30' : 'border-surface-200'
@@ -52,7 +43,7 @@ export default function ExerciseCard({ exercise, onToggle }: ExerciseCardProps) 
         <div className="flex items-start gap-4">
           {/* Checkbox Button */}
           <button
-            onClick={handleClick}
+            onClick={() => onToggle(id)}
             className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
               completed
                 ? 'bg-green-500 border-green-500'
